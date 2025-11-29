@@ -110,6 +110,12 @@
             padding-bottom: 10px;
         }
 
+        h3 {
+            font-size: 18px;
+            margin-top: 20px;
+            color: var(--color-text);
+        }
+
         .form-group {
             margin-bottom: 20px;
         }
@@ -295,6 +301,11 @@
             color: #92400e;
         }
 
+        .badge-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
         .empty-state {
             text-align: center;
             padding: 40px 20px;
@@ -329,7 +340,7 @@
     <div class="container">
         <div class="header">
             <h1>🎓 Project Guide Allocation System</h1>
-            <p>Effortless Project Allocation</p>
+            <p>Intelligent Project Allocation Based on Preferences & CGPA</p>
         </div>
 
         <div class="tabs">
@@ -385,7 +396,7 @@
                     </div>
                 </div>
 
-                <h3 style="margin-top: 30px;">Professor Preferences</h3>
+                <h3>Professor Preferences</h3>
 
                 <div class="form-row">
                     <div class="form-group">
@@ -458,9 +469,13 @@
                         <div class="stat-label">Allocations</div>
                         <div class="stat-value" id="allocations">0</div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-label">1st Choice %</div>
+                        <div class="stat-value" id="firstChoice">0%</div>
+                    </div>
                 </div>
 
-                <button onclick="runAllocation()" class="btn-success" style="width: 100%; padding: 15px; font-size: 16px; margin-bottom: 20px;">⚡ Run Allocation</button>
+                <button onclick="runAllocation()" class="btn-success" style="width: 100%; padding: 15px; font-size: 16px; margin-bottom: 20px;">⚡ Run Smart Allocation</button>
 
                 <h3>Allocation Results</h3>
                 <div id="resultsTable" class="table-container">
@@ -476,10 +491,22 @@
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:5000/api';
+        // ============ DYNAMIC API BASE URL ============
+        const getAPIBase = () => {
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                return 'http://localhost:5000/api';
+            } else {
+                // For Vercel deployment
+                return `${window.location.origin}/api`;
+            }
+        };
+
+        let API_BASE = getAPIBase();
         let students = [];
         let professors = [];
         let allocations = [];
+
+        console.log('Using API Base:', API_BASE);
 
         // Switch tabs
         function switchTab(tab) {
@@ -524,16 +551,25 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        roll, email, name, cgpa, projectTitle, domain,
+                        roll, email, name, cgpa: parseFloat(cgpa), projectTitle, domain,
                         preferences: [pref1, pref2, pref3]
                     })
                 });
 
                 if (response.ok) {
                     showAlert('studentAlert', '✅ Student registered successfully!', 'success');
-                    document.querySelectorAll('input').forEach(el => el.value = '');
+                    document.getElementById('roll').value = '';
+                    document.getElementById('email').value = '';
+                    document.getElementById('name').value = '';
+                    document.getElementById('cgpa').value = '';
+                    document.getElementById('projectTitle').value = '';
+                    document.getElementById('domain').value = '';
+                    document.getElementById('pref1').value = '';
+                    document.getElementById('pref2').value = '';
+                    document.getElementById('pref3').value = '';
                 } else {
-                    showAlert('studentAlert', '❌ Error registering student', 'error');
+                    const error = await response.json();
+                    showAlert('studentAlert', '❌ ' + error.error, 'error');
                 }
             } catch (err) {
                 showAlert('studentAlert', '❌ ' + err.message, 'error');
@@ -557,14 +593,19 @@
                 const response = await fetch(`${API_BASE}/professors`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, email, department, expertise, capacity })
+                    body: JSON.stringify({ name, email, department, expertise, capacity: parseInt(capacity) })
                 });
 
                 if (response.ok) {
                     showAlert('professorAlert', '✅ Professor registered successfully!', 'success');
-                    document.querySelectorAll('input').forEach(el => el.value = '');
+                    document.getElementById('profName').value = '';
+                    document.getElementById('profEmail').value = '';
+                    document.getElementById('department').value = '';
+                    document.getElementById('expertise').value = '';
+                    document.getElementById('capacity').value = '5';
                 } else {
-                    showAlert('professorAlert', '❌ Error registering professor', 'error');
+                    const error = await response.json();
+                    showAlert('professorAlert', '❌ ' + error.error, 'error');
                 }
             } catch (err) {
                 showAlert('professorAlert', '❌ ' + err.message, 'error');
@@ -574,58 +615,40 @@
         // Load stats
         async function loadStats() {
             try {
-                const [studRes, profRes, allocRes] = await Promise.all([
-                    fetch(`${API_BASE}/students`),
-                    fetch(`${API_BASE}/professors`),
-                    fetch(`${API_BASE}/allocations`)
-                ]);
+                const statsRes = await fetch(`${API_BASE}/stats`);
+                const stats = await statsRes.json();
 
-                students = await studRes.json();
-                professors = await profRes.json();
+                document.getElementById('totalStudents').textContent = stats.totalStudents;
+                document.getElementById('totalProfessors').textContent = stats.totalProfessors;
+                document.getElementById('allocations').textContent = stats.allocationCount;
+                document.getElementById('firstChoice').textContent = stats.firstChoice + '%';
+
+                // Load allocations
+                const allocRes = await fetch(`${API_BASE}/allocations`);
                 allocations = await allocRes.json();
-
-                document.getElementById('totalStudents').textContent = students.length;
-                document.getElementById('totalProfessors').textContent = professors.length;
-                document.getElementById('allocations').textContent = allocations.length;
-
                 displayResults();
             } catch (err) {
                 console.error('Error loading stats:', err);
+                showAlert('adminAlert', '❌ Error loading data', 'error');
             }
         }
 
         // Run allocation
         async function runAllocation() {
-            if (students.length === 0 || professors.length === 0) {
-                showAlert('adminAlert', '❌ Need students and professors first', 'error');
-                return;
-            }
-
-            // Simple allocation algorithm
-            const newAllocations = [];
-            students.forEach(student => {
-                const prof = professors[Math.floor(Math.random() * professors.length)];
-                newAllocations.push({
-                    studentName: student.name,
-                    studentEmail: student.email,
-                    professorName: prof.name,
-                    preferenceRank: Math.floor(Math.random() * 3) + 1
-                });
-            });
-
             try {
                 const response = await fetch(`${API_BASE}/allocations/bulk`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ allocations: newAllocations })
+                    body: JSON.stringify({})
                 });
 
                 if (response.ok) {
-                    allocations = newAllocations;
+                    const result = await response.json();
+                    showAlert('adminAlert', `✅ ${result.count} allocations completed!`, 'success');
                     loadStats();
-                    showAlert('adminAlert', '✅ Allocation completed!', 'success');
                 } else {
-                    showAlert('adminAlert', '❌ Error in allocation', 'error');
+                    const error = await response.json();
+                    showAlert('adminAlert', '❌ ' + error.error, 'error');
                 }
             } catch (err) {
                 showAlert('adminAlert', '❌ ' + err.message, 'error');
@@ -641,15 +664,21 @@
                 return;
             }
 
-            let html = '<table><thead><tr><th>Student</th><th>Professor</th><th>Preference</th></tr></thead><tbody>';
+            let html = '<table><thead><tr><th>Student</th><th>CGPA</th><th>Domain</th><th>Professor</th><th>Preference</th><th>Score</th></tr></thead><tbody>';
             
             allocations.forEach(alloc => {
                 const ranks = ['', '🥇 1st', '🥈 2nd', '🥉 3rd'];
+                const prefRank = alloc.preferenceRank || 0;
+                const badge = prefRank === 1 ? 'badge-success' : prefRank === 0 ? 'badge-warning' : 'badge-info';
+                
                 html += `
                     <tr>
                         <td>${alloc.studentName}</td>
+                        <td>${alloc.studentCGPA?.toFixed(2) || 'N/A'}</td>
+                        <td>${alloc.studentDomain || 'N/A'}</td>
                         <td>${alloc.professorName}</td>
-                        <td><span class="badge badge-success">${ranks[alloc.preferenceRank]}</span></td>
+                        <td><span class="badge ${badge}">${ranks[prefRank] || 'Not Preferred'}</span></td>
+                        <td><strong>${alloc.allocationScore || 0}</strong></td>
                     </tr>
                 `;
             });
@@ -660,22 +689,28 @@
 
         // Reset system
         async function resetSystem() {
-            if (!confirm('Are you sure? This will delete all data!')) return;
+            if (!confirm('⚠️ Are you sure? This will delete ALL data!')) return;
 
             try {
-                await fetch(`${API_BASE}/reset`, { method: 'POST' });
-                students = [];
-                professors = [];
-                allocations = [];
-                loadStats();
-                showAlert('adminAlert', '✅ System reset!', 'success');
+                const response = await fetch(`${API_BASE}/reset`, { method: 'POST' });
+                if (response.ok) {
+                    students = [];
+                    professors = [];
+                    allocations = [];
+                    loadStats();
+                    showAlert('adminAlert', '✅ System reset successfully!', 'success');
+                } else {
+                    showAlert('adminAlert', '❌ Error resetting system', 'error');
+                }
             } catch (err) {
                 showAlert('adminAlert', '❌ ' + err.message, 'error');
             }
         }
 
         // Load stats on page load
-        loadStats();
+        window.addEventListener('load', () => {
+            loadStats();
+        });
     </script>
 </body>
 </html>
