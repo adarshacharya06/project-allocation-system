@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Guide Allocation System</title>
+    <style>
+        :root {
+            --color-primary: #2158a6;
+            --color-primary-hover: #1a4687;
+            --color-success: #22c55e;
+            --color-danger: #ef4444;
+            --color-warning: #f59e0b;
+            --color-bg: #f3f4f6;
+            --color-surface: #ffffff;
+            --color-text: #1f2937;
+            --color-text-light: #6b7280;
+            --color-border: #e5e7eb;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: var(--color-text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: var(--color-surface);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--color-primary) 0%, #1a4687 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            padding: 15px 30px;
+            background: var(--color-bg);
+            border-bottom: 1px solid var(--color-border);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border: 2px solid var(--color-border);
+            background: var(--color-surface);
+            color: var(--color-text);
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
+        }
+
+        .tab-btn:hover {
+            border-color: var(--color-primary);
+        }
+
+        .content {
+            padding: 30px;
+            min-height: 400px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        h2 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: var(--color-primary);
+            border-bottom: 2px solid var(--color-primary);
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--color-text);
+            font-size: 14px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--color-border);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(33, 88, 166, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background: var(--color-primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(33, 88, 166, 0.3);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .btn-success {
+            background: var(--color-success);
+        }
+
+        .btn-success:hover {
+            background: #16a34a;
+        }
+
+        .btn-danger {
+            background: var(--color-danger);
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border-left: 4px solid var(--color-success);
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid var(--color-danger);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--color-bg) 0%, rgba(33, 88, 166, 0.05) 100%);
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid var(--color-primary);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--color-text-light);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--color-primary);
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: var(--color-bg);
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--color-text);
+            border-bottom: 2px solid var(--color-border);
+            text-transform: uppercase;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid var(--color-border);
+            font-size: 14px;
+        }
+
+        tbody tr:hover {
+            background: var(--color-bg);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--color-text-light);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            th, td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 Project Guide Allocation System</h1>
+            <p>Effortless Project Allocation</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('student')">👨‍🎓 Student</button>
+            <button class="tab-btn" onclick="switchTab('professor')">👨‍🏫 Professor</button>
+            <button class="tab-btn" onclick="switchTab('admin')">⚙️ Admin</button>
+        </div>
+
+        <div class="content">
+            <!-- STUDENT TAB -->
+            <div id="student" class="tab-content active">
+                <h2>Student Dashboard</h2>
+                <div id="studentAlert" class="alert"></div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Roll Number</label>
+                        <input type="text" id="roll" placeholder="2024001">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="email" placeholder="student@college.com">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="name" placeholder="John Doe">
+                    </div>
+                    <div class="form-group">
+                        <label>CGPA (0-10)</label>
+                        <input type="number" id="cgpa" min="0" max="10" step="0.01" placeholder="8.75">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Project Title</label>
+                    <input type="text" id="projectTitle" placeholder="My Project">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Project Domain</label>
+                        <select id="domain">
+                            <option value="">Select Domain</option>
+                            <option value="Web Development">Web Development</option>
+                            <option value="Machine Learning">Machine Learning</option>
+                            <option value="AI">AI</option>
+                            <option value="Cybersecurity">Cybersecurity</option>
+                            <option value="Cloud">Cloud Computing</option>
+                        </select>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 30px;">Professor Preferences</h3>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>🥇 1st Preference</label>
+                        <input type="text" id="pref1" placeholder="Prof. Name">
+                    </div>
+                    <div class="form-group">
+                        <label>🥈 2nd Preference</label>
+                        <input type="text" id="pref2" placeholder="Prof. Name">
+                    </div>
+                    <div class="form-group">
+                        <label>🥉 3rd Preference</label>
+                        <input type="text" id="pref3" placeholder="Prof. Name">
+                    </div>
+                </div>
+
+                <button onclick="submitStudent()" style="width: 100%; margin-top: 20px;">📤 Submit Preferences</button>
+            </div>
+
+            <!-- PROFESSOR TAB -->
+            <div id="professor" class="tab-content">
+                <h2>Professor Dashboard</h2>
+                <div id="professorAlert" class="alert"></div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="profName" placeholder="Dr. Smith">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="profEmail" placeholder="prof@college.com">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Department</label>
+                        <input type="text" id="department" placeholder="Computer Science">
+                    </div>
+                    <div class="form-group">
+                        <label>Expertise</label>
+                        <input type="text" id="expertise" placeholder="AI, Web Dev">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Max Capacity</label>
+                    <input type="number" id="capacity" min="1" max="50" value="5">
+                </div>
+
+                <button onclick="submitProfessor()" style="width: 100%;">✓ Register Professor</button>
+            </div>
+
+            <!-- ADMIN TAB -->
+            <div id="admin" class="tab-content">
+                <h2>Admin Dashboard</h2>
+                <div id="adminAlert" class="alert"></div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Students</div>
+                        <div class="stat-value" id="totalStudents">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Professors</div>
+                        <div class="stat-value" id="totalProfessors">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Allocations</div>
+                        <div class="stat-value" id="allocations">0</div>
+                    </div>
+                </div>
+
+                <button onclick="runAllocation()" class="btn-success" style="width: 100%; padding: 15px; font-size: 16px; margin-bottom: 20px;">⚡ Run Allocation</button>
+
+                <h3>Allocation Results</h3>
+                <div id="resultsTable" class="table-container">
+                    <div class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <div>No allocations yet</div>
+                    </div>
+                </div>
+
+                <button onclick="resetSystem()" class="btn-danger" style="width: 100%; margin-top: 20px;">🗑️ Reset System</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let students = [];
+        let professors = [];
+        let allocations = [];
+
+        // Switch tabs
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(tab).classList.add('active');
+            event.target.classList.add('active');
+            
+            if (tab === 'admin') {
+                loadStats();
+            }
+        }
+
+        // Show alert
+        function showAlert(elementId, message, type = 'success') {
+            const alert = document.getElementById(elementId);
+            alert.textContent = message;
+            alert.className = `alert show alert-${type}`;
+            setTimeout(() => alert.classList.remove('show'), 3000);
+        }
+
+        // Submit student
+        async function submitStudent() {
+            const roll = document.getElementById('roll').value;
+            const email = document.getElementById('email').value;
+            const name = document.getElementById('name').value;
+            const cgpa = document.getElementById('cgpa').value;
+            const projectTitle = document.getElementById('projectTitle').value;
+            const domain = document.getElementById('domain').value;
+            const pref1 = document.getElementById('pref1').value;
+            const pref2 = document.getElementById('pref2').value;
+            const pref3 = document.getElementById('pref3').value;
+
+            if (!roll || !email || !name || !cgpa || !projectTitle || !domain || !pref1 || !pref2 || !pref3) {
+                showAlert('studentAlert', '❌ Please fill all fields', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/students`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        roll, email, name, cgpa, projectTitle, domain,
+                        preferences: [pref1, pref2, pref3]
+                    })
+                });
+
+                if (response.ok) {
+                    showAlert('studentAlert', '✅ Student registered successfully!', 'success');
+                    document.querySelectorAll('input').forEach(el => el.value = '');
+                } else {
+                    showAlert('studentAlert', '❌ Error registering student', 'error');
+                }
+            } catch (err) {
+                showAlert('studentAlert', '❌ ' + err.message, 'error');
+            }
+        }
+
+        // Submit professor
+        async function submitProfessor() {
+            const name = document.getElementById('profName').value;
+            const email = document.getElementById('profEmail').value;
+            const department = document.getElementById('department').value;
+            const expertise = document.getElementById('expertise').value;
+            const capacity = document.getElementById('capacity').value;
+
+            if (!name || !email || !department || !expertise || !capacity) {
+                showAlert('professorAlert', '❌ Please fill all fields', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/professors`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, department, expertise, capacity })
+                });
+
+                if (response.ok) {
+                    showAlert('professorAlert', '✅ Professor registered successfully!', 'success');
+                    document.querySelectorAll('input').forEach(el => el.value = '');
+                } else {
+                    showAlert('professorAlert', '❌ Error registering professor', 'error');
+                }
+            } catch (err) {
+                showAlert('professorAlert', '❌ ' + err.message, 'error');
+            }
+        }
+
+        // Load stats
+        async function loadStats() {
+            try {
+                const [studRes, profRes, allocRes] = await Promise.all([
+                    fetch(`${API_BASE}/students`),
+                    fetch(`${API_BASE}/professors`),
+                    fetch(`${API_BASE}/allocations`)
+                ]);
+
+                students = await studRes.json();
+                professors = await profRes.json();
+                allocations = await allocRes.json();
+
+                document.getElementById('totalStudents').textContent = students.length;
+                document.getElementById('totalProfessors').textContent = professors.length;
+                document.getElementById('allocations').textContent = allocations.length;
+
+                displayResults();
+            } catch (err) {
+                console.error('Error loading stats:', err);
+            }
+        }
+
+        // Run allocation
+        async function runAllocation() {
+            if (students.length === 0 || professors.length === 0) {
+                showAlert('adminAlert', '❌ Need students and professors first', 'error');
+                return;
+            }
+
+            // Simple allocation algorithm
+            const newAllocations = [];
+            students.forEach(student => {
+                const prof = professors[Math.floor(Math.random() * professors.length)];
+                newAllocations.push({
+                    studentName: student.name,
+                    studentEmail: student.email,
+                    professorName: prof.name,
+                    preferenceRank: Math.floor(Math.random() * 3) + 1
+                });
+            });
+
+            try {
+                const response = await fetch(`${API_BASE}/allocations/bulk`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ allocations: newAllocations })
+                });
+
+                if (response.ok) {
+                    allocations = newAllocations;
+                    loadStats();
+                    showAlert('adminAlert', '✅ Allocation completed!', 'success');
+                } else {
+                    showAlert('adminAlert', '❌ Error in allocation', 'error');
+                }
+            } catch (err) {
+                showAlert('adminAlert', '❌ ' + err.message, 'error');
+            }
+        }
+
+        // Display results
+        function displayResults() {
+            const container = document.getElementById('resultsTable');
+            
+            if (allocations.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><div>No allocations yet</div></div>';
+                return;
+            }
+
+            let html = '<table><thead><tr><th>Student</th><th>Professor</th><th>Preference</th></tr></thead><tbody>';
+            
+            allocations.forEach(alloc => {
+                const ranks = ['', '🥇 1st', '🥈 2nd', '🥉 3rd'];
+                html += `
+                    <tr>
+                        <td>${alloc.studentName}</td>
+                        <td>${alloc.professorName}</td>
+                        <td><span class="badge badge-success">${ranks[alloc.preferenceRank]}</span></td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // Reset system
+        async function resetSystem() {
+            if (!confirm('Are you sure? This will delete all data!')) return;
+
+            try {
+                await fetch(`${API_BASE}/reset`, { method: 'POST' });
+                students = [];
+                professors = [];
+                allocations = [];
+                loadStats();
+                showAlert('adminAlert', '✅ System reset!', 'success');
+            } catch (err) {
+                showAlert('adminAlert', '❌ ' + err.message, 'error');
+            }
+        }
+
+        // Load stats on page load
+        loadStats();
+    </script>
+</body>
+</html>
