@@ -20,7 +20,7 @@ app.use(
 app.use(express.json());
 app.use(express.static('public'));
 
-// Additional CORS headers
+// Extra CORS headers
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -31,7 +31,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// MongoDB Connection
+// ============ MONGODB CONNECTION ============
 const mongoURI =
   process.env.MONGODB_URI || 'mongodb://localhost:27017/project-allocation';
 
@@ -42,7 +42,7 @@ mongoose
   })
   .then(() => {
     console.log('✅ MongoDB Connected Successfully');
-    console.log(`📍 Database: project-allocation`);
+    console.log('📍 Database: project-allocation');
   })
   .catch((err) => {
     console.log('❌ MongoDB Connection Error:', err.message);
@@ -51,7 +51,6 @@ mongoose
   });
 
 // ============ SCHEMAS ============
-
 const studentSchema = new mongoose.Schema({
   roll: String,
   name: String,
@@ -88,11 +87,10 @@ const Student = mongoose.model('Student', studentSchema);
 const Professor = mongoose.model('Professor', professorSchema);
 const Allocation = mongoose.model('Allocation', allocationSchema);
 
-// ============ SMART ALLOCATION ALGORITHM ============
-
+// ============ SIMPLE, CAPACITY-SAFE ALGORITHM ============
 async function smartAllocationAlgorithm() {
   try {
-    // Highest CGPA first
+    // Sort students: highest CGPA first
     const students = await Student.find().sort({ cgpa: -1 });
     const professors = await Professor.find();
 
@@ -100,109 +98,56 @@ async function smartAllocationAlgorithm() {
       throw new Error('No students or professors found');
     }
 
-    // Track capacity and current load
-    const professorAllocations = {};
+    // Track professor capacities
+    const professorState = {};
     let totalCapacity = 0;
 
     professors.forEach((prof) => {
-      const cap = prof.capacity || 0;
-      professorAllocations[prof.name] = {
-        allocations: 0,
-        capacity: cap,
-        expertise: prof.expertise || '',
-      };
+      const cap = Number(prof.capacity) || 0;
+      professorState[prof.name] = { used: 0, cap };
       totalCapacity += cap;
     });
 
     const allocations = [];
 
     for (const student of students) {
-      // Stop when all seats are filled
+      // Stop when all seats filled
       if (allocations.length >= totalCapacity) break;
 
-      let allocated = false;
-      let allocationScore = 0;
       let assignedProfessor = null;
       let preferenceRank = 0;
 
-      // 1) Try preferences first
-      for (let prefIndex = 0; prefIndex < student.preferences.length; prefIndex++) {
-        const prefProfName = student.preferences[prefIndex];
-        const professor = professors.find((p) => p.name === prefProfName);
-        const profData = professor && professorAllocations[prefProfName];
+      const prefs = Array.isArray(student.preferences)
+        ? student.preferences
+        : [];
 
-        if (professor && profData && profData.allocations < profData.capacity) {
-          let score = 100 - prefIndex * 20;
-          score += student.cgpa * 5;
+      // Try preferences strictly in order
+      for (let i = 0; i < prefs.length; i++) {
+        const prefName = prefs[i];
+        const prof = professors.find((p) => p.name === prefName);
+        const state = prof && professorState[prefName];
 
-          if (
-            profData.expertise &&
-            student.domain &&
-            profData.expertise.toLowerCase().includes(student.domain.toLowerCase())
-          ) {
-            score += 30;
-          }
-
-          profData.allocations += 1;
-          assignedProfessor = professor.name;
-          preferenceRank = prefIndex + 1;
-          allocationScore = score;
-          allocated = true;
+        if (prof && state && state.used < state.cap) {
+          state.used += 1;
+          assignedProfessor = prefName;
+          preferenceRank = i + 1; // 1, 2, 3
           break;
         }
       }
 
-      // 2) If still not allocated, choose best available professor
-      if (!allocated) {
-        let bestProfessor = null;
-        let bestScore = -1;
+      // If no preferred professor has capacity, skip this student
+      if (!assignedProfessor) continue;
 
-        for (const prof of professors) {
-          const profData = professorAllocations[prof.name];
-          if (!profData || profData.allocations >= profData.capacity) continue;
-
-          let score = 50;
-
-          if (
-            prof.expertise &&
-            student.domain &&
-            prof.expertise.toLowerCase().includes(student.domain.toLowerCase())
-          ) {
-            score += 40;
-          }
-
-          score += student.cgpa * 3;
-          score += (profData.capacity - profData.allocations) * 2;
-
-          if (score > bestScore) {
-            bestScore = score;
-            bestProfessor = prof;
-          }
-        }
-
-        if (bestProfessor) {
-          const profData = professorAllocations[bestProfessor.name];
-          profData.allocations += 1;
-
-          assignedProfessor = bestProfessor.name;
-          preferenceRank = 0; // not from explicit preferences
-          allocationScore = bestScore;
-          allocated = true;
-        }
-      }
-
-      if (allocated && assignedProfessor) {
-        allocations.push({
-          studentName: student.name,
-          studentEmail: student.email,
-          studentRoll: student.roll,
-          studentCGPA: student.cgpa,
-          studentDomain: student.domain,
-          professorName: assignedProfessor,
-          preferenceRank,
-          allocationScore: Math.round(allocationScore),
-        });
-      }
+      allocations.push({
+        studentName: student.name,
+        studentEmail: student.email,
+        studentRoll: student.roll,
+        studentCGPA: student.cgpa,
+        studentDomain: student.domain,
+        professorName: assignedProfessor,
+        preferenceRank,
+        allocationScore: Math.round((student.cgpa || 0) * 10), // simple score = CGPA weight
+      });
     }
 
     return allocations;
@@ -346,5 +291,5 @@ app.listen(PORT, () => {
   console.log(`\n🚀 Server running on http://localhost:${PORT}`);
   console.log(`📊 Open http://localhost:${PORT} in browser\n`);
   console.log('💾 Data stored in MongoDB\n');
-  console.log('🧠 Smart allocation algorithm enabled\n');
+  console.log('🧠 Smart allocation algorithm (simple capacity-safe) enabled\n');
 });
