@@ -67,7 +67,7 @@ const professorSchema = new mongoose.Schema({
   email: { type: String, unique: true, sparse: true },
   department: String,
   expertise: String, // professor domain (AI, Machine Learning, etc.)
-  capacity: Number,  // max students
+  capacity: Number, // max students
   timestamp: { type: Date, default: Date.now },
 });
 
@@ -108,7 +108,7 @@ async function smartAllocationAlgorithm() {
 
       professorState[key] = {
         displayName: prof.name,
-        expertise: (prof.expertise || '').trim().toLowerCase(), // domain string
+        expertise: (prof.expertise || '').trim().toLowerCase(), // exact domain string
         used: 0,
         cap,
       };
@@ -130,7 +130,7 @@ async function smartAllocationAlgorithm() {
       let assignedKey = null;
       let preferenceRank = 0;
 
-      // 3.a) Try preferred professors whose expertise matches the student's domain
+      // 3.a) Try preferred professors whose expertise EXACTLY matches the student's domain
       for (let i = 0; i < prefs.length; i++) {
         const prefKey = (prefs[i] || '').trim().toLowerCase();
         const state = professorState[prefKey];
@@ -138,7 +138,7 @@ async function smartAllocationAlgorithm() {
         if (
           state &&
           state.used < state.cap &&
-          state.expertise.includes(studentDomain)
+          state.expertise === studentDomain // strict domain match
         ) {
           state.used += 1;
           assignedKey = prefKey;
@@ -177,7 +177,7 @@ async function smartAllocationAlgorithm() {
         preferenceRank,
         allocationScore: Math.round(
           (student.cgpa || 0) * 10 +
-            (state.expertise.includes(studentDomain) ? 20 : 0)
+            (state.expertise === studentDomain ? 20 : 0)
         ),
       });
     }
