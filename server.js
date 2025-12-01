@@ -57,8 +57,8 @@ const studentSchema = new mongoose.Schema({
   email: { type: String, unique: true, sparse: true },
   cgpa: Number,
   projectTitle: String,
-  domain: String,
-  preferences: [String],
+  domain: String, // student project domain
+  preferences: [String], // ordered professor names
   timestamp: { type: Date, default: Date.now },
 });
 
@@ -66,8 +66,8 @@ const professorSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true, sparse: true },
   department: String,
-  expertise: String,
-  capacity: Number,
+  expertise: String, // professor domain (AI, Machine Learning, etc.)
+  capacity: Number,  // max students
   timestamp: { type: Date, default: Date.now },
 });
 
@@ -90,7 +90,7 @@ const Allocation = mongoose.model('Allocation', allocationSchema);
 // ============ DOMAIN + CAPACITY AWARE ALGORITHM ============
 async function smartAllocationAlgorithm() {
   try {
-    // Sort students globally by CGPA (highest first)
+    // 1) Sort all students by CGPA (highest first)
     const students = await Student.find().sort({ cgpa: -1 });
     const professors = await Professor.find();
 
@@ -98,7 +98,7 @@ async function smartAllocationAlgorithm() {
       throw new Error('No students or professors found');
     }
 
-    // Map: normalized professor name -> { displayName, domain, used, cap }
+    // 2) Build professor state: normalized name -> {displayName, expertise, used, cap}
     const professorState = {};
     let totalCapacity = 0;
 
@@ -108,7 +108,7 @@ async function smartAllocationAlgorithm() {
 
       professorState[key] = {
         displayName: prof.name,
-        domain: (prof.expertise || '').trim().toLowerCase(), // prof domain/expertise
+        expertise: (prof.expertise || '').trim().toLowerCase(), // domain string
         used: 0,
         cap,
       };
@@ -118,8 +118,9 @@ async function smartAllocationAlgorithm() {
 
     const allocations = [];
 
+    // 3) Allocate students one by one
     for (const student of students) {
-      if (allocations.length >= totalCapacity) break; // all seats filled
+      if (allocations.length >= totalCapacity) break; // all seats filled globally
 
       const studentDomain = (student.domain || '').trim().toLowerCase();
       const prefs = Array.isArray(student.preferences)
@@ -129,7 +130,7 @@ async function smartAllocationAlgorithm() {
       let assignedKey = null;
       let preferenceRank = 0;
 
-      // 1) Try preferences that MATCH the student's domain
+      // 3.a) Try preferred professors whose expertise matches the student's domain
       for (let i = 0; i < prefs.length; i++) {
         const prefKey = (prefs[i] || '').trim().toLowerCase();
         const state = professorState[prefKey];
@@ -137,16 +138,16 @@ async function smartAllocationAlgorithm() {
         if (
           state &&
           state.used < state.cap &&
-          state.domain.includes(studentDomain)
+          state.expertise.includes(studentDomain)
         ) {
           state.used += 1;
           assignedKey = prefKey;
-          preferenceRank = i + 1;
+          preferenceRank = i + 1; // 1, 2, 3
           break;
         }
       }
 
-      // 2) If still not allocated, allow any preferred prof with capacity (fallback)
+      // 3.b) Fallback: allow any preferred professor with remaining capacity (even if domain differs)
       if (!assignedKey) {
         for (let i = 0; i < prefs.length; i++) {
           const prefKey = (prefs[i] || '').trim().toLowerCase();
@@ -161,7 +162,7 @@ async function smartAllocationAlgorithm() {
         }
       }
 
-      // 3) If still nothing, skip this student
+      // 3.c) If still not allocated, skip this student
       if (!assignedKey) continue;
 
       const state = professorState[assignedKey];
@@ -176,7 +177,7 @@ async function smartAllocationAlgorithm() {
         preferenceRank,
         allocationScore: Math.round(
           (student.cgpa || 0) * 10 +
-            (state.domain.includes(studentDomain) ? 20 : 0)
+            (state.expertise.includes(studentDomain) ? 20 : 0)
         ),
       });
     }
@@ -323,6 +324,6 @@ app.listen(PORT, () => {
   console.log(`📊 Open http://localhost:${PORT} in browser\n`);
   console.log('💾 Data stored in MongoDB\n');
   console.log(
-    '🧠 Smart allocation algorithm (domain-aware, capacity-safe, normalized names) enabled\n'
+    '🧠 Smart allocation algorithm (domain-wise, capacity-limited, preference-based) enabled\n'
   );
 });
