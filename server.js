@@ -87,10 +87,10 @@ const Student = mongoose.model('Student', studentSchema);
 const Professor = mongoose.model('Professor', professorSchema);
 const Allocation = mongoose.model('Allocation', allocationSchema);
 
-// ============ SIMPLE, CAPACITY-SAFE ALGORITHM (NORMALIZED NAMES) ============
+// ============ DOMAIN + CAPACITY AWARE ALGORITHM ============
 async function smartAllocationAlgorithm() {
   try {
-    // Sort students: highest CGPA first
+    // Sort students globally by CGPA (highest first)
     const students = await Student.find().sort({ cgpa: -1 });
     const professors = await Professor.find();
 
@@ -98,49 +98,70 @@ async function smartAllocationAlgorithm() {
       throw new Error('No students or professors found');
     }
 
-    // Track professor capacities by normalized name
+    // Map: normalized professor name -> { displayName, domain, used, cap }
     const professorState = {};
     let totalCapacity = 0;
 
     professors.forEach((prof) => {
-      const key = (prof.name || '').trim().toLowerCase(); // normalized key
+      const key = (prof.name || '').trim().toLowerCase();
       const cap = Number(prof.capacity) || 0;
 
       professorState[key] = {
-        displayName: prof.name, // original for UI
+        displayName: prof.name,
+        domain: (prof.expertise || '').trim().toLowerCase(), // prof domain/expertise
         used: 0,
         cap,
       };
+
       totalCapacity += cap;
     });
 
     const allocations = [];
 
     for (const student of students) {
-      // Stop when all seats filled
-      if (allocations.length >= totalCapacity) break;
+      if (allocations.length >= totalCapacity) break; // all seats filled
 
-      let assignedKey = null;
-      let preferenceRank = 0;
-
+      const studentDomain = (student.domain || '').trim().toLowerCase();
       const prefs = Array.isArray(student.preferences)
         ? student.preferences
         : [];
 
-      // Try preferences strictly in order, using normalized keys
+      let assignedKey = null;
+      let preferenceRank = 0;
+
+      // 1) Try preferences that MATCH the student's domain
       for (let i = 0; i < prefs.length; i++) {
         const prefKey = (prefs[i] || '').trim().toLowerCase();
         const state = professorState[prefKey];
 
-        if (state && state.used < state.cap) {
+        if (
+          state &&
+          state.used < state.cap &&
+          state.domain.includes(studentDomain)
+        ) {
           state.used += 1;
           assignedKey = prefKey;
-          preferenceRank = i + 1; // 1, 2, 3
+          preferenceRank = i + 1;
           break;
         }
       }
 
-      // If no preferred professor has capacity, skip this student
+      // 2) If still not allocated, allow any preferred prof with capacity (fallback)
+      if (!assignedKey) {
+        for (let i = 0; i < prefs.length; i++) {
+          const prefKey = (prefs[i] || '').trim().toLowerCase();
+          const state = professorState[prefKey];
+
+          if (state && state.used < state.cap) {
+            state.used += 1;
+            assignedKey = prefKey;
+            preferenceRank = i + 1;
+            break;
+          }
+        }
+      }
+
+      // 3) If still nothing, skip this student
       if (!assignedKey) continue;
 
       const state = professorState[assignedKey];
@@ -151,9 +172,12 @@ async function smartAllocationAlgorithm() {
         studentRoll: student.roll,
         studentCGPA: student.cgpa,
         studentDomain: student.domain,
-        professorName: state.displayName, // show original name
+        professorName: state.displayName,
         preferenceRank,
-        allocationScore: Math.round((student.cgpa || 0) * 10), // simple score
+        allocationScore: Math.round(
+          (student.cgpa || 0) * 10 +
+            (state.domain.includes(studentDomain) ? 20 : 0)
+        ),
       });
     }
 
@@ -298,5 +322,7 @@ app.listen(PORT, () => {
   console.log(`\n🚀 Server running on http://localhost:${PORT}`);
   console.log(`📊 Open http://localhost:${PORT} in browser\n`);
   console.log('💾 Data stored in MongoDB\n');
-  console.log('🧠 Smart allocation algorithm (simple capacity-safe, normalized names) enabled\n');
+  console.log(
+    '🧠 Smart allocation algorithm (domain-aware, capacity-safe, normalized names) enabled\n'
+  );
 });
