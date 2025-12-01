@@ -87,7 +87,7 @@ const Student = mongoose.model('Student', studentSchema);
 const Professor = mongoose.model('Professor', professorSchema);
 const Allocation = mongoose.model('Allocation', allocationSchema);
 
-// ============ SIMPLE, CAPACITY-SAFE ALGORITHM ============
+// ============ SIMPLE, CAPACITY-SAFE ALGORITHM (NORMALIZED NAMES) ============
 async function smartAllocationAlgorithm() {
   try {
     // Sort students: highest CGPA first
@@ -98,13 +98,19 @@ async function smartAllocationAlgorithm() {
       throw new Error('No students or professors found');
     }
 
-    // Track professor capacities
+    // Track professor capacities by normalized name
     const professorState = {};
     let totalCapacity = 0;
 
     professors.forEach((prof) => {
+      const key = (prof.name || '').trim().toLowerCase(); // normalized key
       const cap = Number(prof.capacity) || 0;
-      professorState[prof.name] = { used: 0, cap };
+
+      professorState[key] = {
+        displayName: prof.name, // original for UI
+        used: 0,
+        cap,
+      };
       totalCapacity += cap;
     });
 
@@ -114,29 +120,30 @@ async function smartAllocationAlgorithm() {
       // Stop when all seats filled
       if (allocations.length >= totalCapacity) break;
 
-      let assignedProfessor = null;
+      let assignedKey = null;
       let preferenceRank = 0;
 
       const prefs = Array.isArray(student.preferences)
         ? student.preferences
         : [];
 
-      // Try preferences strictly in order
+      // Try preferences strictly in order, using normalized keys
       for (let i = 0; i < prefs.length; i++) {
-        const prefName = prefs[i];
-        const prof = professors.find((p) => p.name === prefName);
-        const state = prof && professorState[prefName];
+        const prefKey = (prefs[i] || '').trim().toLowerCase();
+        const state = professorState[prefKey];
 
-        if (prof && state && state.used < state.cap) {
+        if (state && state.used < state.cap) {
           state.used += 1;
-          assignedProfessor = prefName;
+          assignedKey = prefKey;
           preferenceRank = i + 1; // 1, 2, 3
           break;
         }
       }
 
       // If no preferred professor has capacity, skip this student
-      if (!assignedProfessor) continue;
+      if (!assignedKey) continue;
+
+      const state = professorState[assignedKey];
 
       allocations.push({
         studentName: student.name,
@@ -144,9 +151,9 @@ async function smartAllocationAlgorithm() {
         studentRoll: student.roll,
         studentCGPA: student.cgpa,
         studentDomain: student.domain,
-        professorName: assignedProfessor,
+        professorName: state.displayName, // show original name
         preferenceRank,
-        allocationScore: Math.round((student.cgpa || 0) * 10), // simple score = CGPA weight
+        allocationScore: Math.round((student.cgpa || 0) * 10), // simple score
       });
     }
 
@@ -291,5 +298,5 @@ app.listen(PORT, () => {
   console.log(`\n🚀 Server running on http://localhost:${PORT}`);
   console.log(`📊 Open http://localhost:${PORT} in browser\n`);
   console.log('💾 Data stored in MongoDB\n');
-  console.log('🧠 Smart allocation algorithm (simple capacity-safe) enabled\n');
+  console.log('🧠 Smart allocation algorithm (simple capacity-safe, normalized names) enabled\n');
 });
