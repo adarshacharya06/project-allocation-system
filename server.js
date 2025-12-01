@@ -86,7 +86,7 @@ const allocationSchema = new mongoose.Schema({
 const Student = mongoose.model('Student', studentSchema);
 const Professor = mongoose.model('Professor', professorSchema);
 const Allocation = mongoose.model('Allocation', allocationSchema);
-
+// ============ DOMAIN + CAPACITY AWARE ALGORITHM ============
 // ============ DOMAIN + CAPACITY AWARE ALGORITHM ============
 async function smartAllocationAlgorithm() {
   try {
