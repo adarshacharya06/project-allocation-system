@@ -7,18 +7,20 @@ require('dotenv').config();
 const app = express();
 
 // ============ CORS CONFIGURATION ============
-app.use(cors({
-  origin: '*',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(
+  cors({
+    origin: '*',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 
 // Middleware
 app.use(express.json());
 app.use(express.static('public'));
 
-// Add this header for additional CORS support
+// Additional CORS headers
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -30,21 +32,23 @@ app.use((req, res, next) => {
 });
 
 // MongoDB Connection
-const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/project-allocation';
+const mongoURI =
+  process.env.MONGODB_URI || 'mongodb://localhost:27017/project-allocation';
 
-mongoose.connect(mongoURI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => {
-  console.log('✅ MongoDB Connected Successfully');
-  console.log(`📍 Database: project-allocation`);
-})
-.catch(err => {
-  console.log('❌ MongoDB Connection Error:', err.message);
-  console.log('⚠️  Make sure MongoDB is running with: mongod');
-  process.exit(1);
-});
+mongoose
+  .connect(mongoURI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => {
+    console.log('✅ MongoDB Connected Successfully');
+    console.log(`📍 Database: project-allocation`);
+  })
+  .catch((err) => {
+    console.log('❌ MongoDB Connection Error:', err.message);
+    console.log('⚠️  Make sure MongoDB is running with: mongod');
+    process.exit(1);
+  });
 
 // ============ SCHEMAS ============
 
@@ -56,7 +60,7 @@ const studentSchema = new mongoose.Schema({
   projectTitle: String,
   domain: String,
   preferences: [String],
-  timestamp: { type: Date, default: Date.now }
+  timestamp: { type: Date, default: Date.now },
 });
 
 const professorSchema = new mongoose.Schema({
@@ -65,7 +69,7 @@ const professorSchema = new mongoose.Schema({
   department: String,
   expertise: String,
   capacity: Number,
-  timestamp: { type: Date, default: Date.now }
+  timestamp: { type: Date, default: Date.now },
 });
 
 const allocationSchema = new mongoose.Schema({
@@ -77,7 +81,7 @@ const allocationSchema = new mongoose.Schema({
   professorName: String,
   preferenceRank: Number,
   allocationScore: Number,
-  timestamp: { type: Date, default: Date.now }
+  timestamp: { type: Date, default: Date.now },
 });
 
 const Student = mongoose.model('Student', studentSchema);
@@ -88,102 +92,106 @@ const Allocation = mongoose.model('Allocation', allocationSchema);
 
 async function smartAllocationAlgorithm() {
   try {
+    // Highest CGPA first
     const students = await Student.find().sort({ cgpa: -1 });
     const professors = await Professor.find();
-    
+
     if (students.length === 0 || professors.length === 0) {
       throw new Error('No students or professors found');
     }
 
-    // Track professor allocations and capacity
+    // Track capacity and current load
     const professorAllocations = {};
-    professors.forEach(prof => {
+    let totalCapacity = 0;
+
+    professors.forEach((prof) => {
+      const cap = prof.capacity || 0;
       professorAllocations[prof.name] = {
-        allocations: [],
-        capacity: prof.capacity || 5,
-        expertise: prof.expertise || ''
+        allocations: 0,
+        capacity: cap,
+        expertise: prof.expertise || '',
       };
+      totalCapacity += cap;
     });
 
     const allocations = [];
 
-    // Allocate students based on preferences, CGPA, and domain match
     for (const student of students) {
+      // Stop when all seats are filled
+      if (allocations.length >= totalCapacity) break;
+
       let allocated = false;
       let allocationScore = 0;
       let assignedProfessor = null;
       let preferenceRank = 0;
 
-      // Try to allocate based on preferences (1st choice first, then 2nd, then 3rd)
+      // 1) Try preferences first
       for (let prefIndex = 0; prefIndex < student.preferences.length; prefIndex++) {
         const prefProfName = student.preferences[prefIndex];
-        
-        const professor = professors.find(p => p.name === prefProfName);
-        
-        if (professor && professorAllocations[prefProfName]) {
-          const profData = professorAllocations[prefProfName];
-          
-          if (profData.allocations.length < profData.capacity) {
-            let score = 100 - (prefIndex * 20);
-            score += student.cgpa * 5;
-            
-            if (profData.expertise && student.domain && 
-                profData.expertise.toLowerCase().includes(student.domain.toLowerCase())) {
-              score += 30;
-            }
-            
-            profData.allocations.push({
-              studentName: student.name,
-              studentEmail: student.email
-            });
-            
-            assignedProfessor = professor.name;
-            preferenceRank = prefIndex + 1;
-            allocationScore = score;
-            allocated = true;
-            break;
+        const professor = professors.find((p) => p.name === prefProfName);
+        const profData = professor && professorAllocations[prefProfName];
+
+        if (professor && profData && profData.allocations < profData.capacity) {
+          let score = 100 - prefIndex * 20;
+          score += student.cgpa * 5;
+
+          if (
+            profData.expertise &&
+            student.domain &&
+            profData.expertise.toLowerCase().includes(student.domain.toLowerCase())
+          ) {
+            score += 30;
           }
+
+          profData.allocations += 1;
+          assignedProfessor = professor.name;
+          preferenceRank = prefIndex + 1;
+          allocationScore = score;
+          allocated = true;
+          break;
         }
       }
 
-      // If not allocated through preferences, find best available professor
+      // 2) If still not allocated, choose best available professor
       if (!allocated) {
         let bestProfessor = null;
         let bestScore = -1;
 
         for (const prof of professors) {
-          if (professorAllocations[prof.name].allocations.length < professorAllocations[prof.name].capacity) {
-            let score = 50;
+          const profData = professorAllocations[prof.name];
+          if (!profData || profData.allocations >= profData.capacity) continue;
 
-            if (prof.expertise && student.domain && 
-                prof.expertise.toLowerCase().includes(student.domain.toLowerCase())) {
-              score += 40;
-            }
+          let score = 50;
 
-            score += student.cgpa * 3;
-            score += (20 - professorAllocations[prof.name].allocations.length) * 2;
+          if (
+            prof.expertise &&
+            student.domain &&
+            prof.expertise.toLowerCase().includes(student.domain.toLowerCase())
+          ) {
+            score += 40;
+          }
 
-            if (score > bestScore) {
-              bestScore = score;
-              bestProfessor = prof;
-            }
+          score += student.cgpa * 3;
+          score += (profData.capacity - profData.allocations) * 2;
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestProfessor = prof;
           }
         }
 
         if (bestProfessor) {
-          professorAllocations[bestProfessor.name].allocations.push({
-            studentName: student.name,
-            studentEmail: student.email
-          });
+          const profData = professorAllocations[bestProfessor.name];
+          profData.allocations += 1;
 
           assignedProfessor = bestProfessor.name;
-          preferenceRank = 0;
+          preferenceRank = 0; // not from explicit preferences
           allocationScore = bestScore;
           allocated = true;
         }
       }
 
-      if (allocated) {
+      if (allocated && assignedProfessor) {
         allocations.push({
           studentName: student.name,
           studentEmail: student.email,
@@ -191,8 +199,8 @@ async function smartAllocationAlgorithm() {
           studentCGPA: student.cgpa,
           studentDomain: student.domain,
           professorName: assignedProfessor,
-          preferenceRank: preferenceRank,
-          allocationScore: Math.round(allocationScore)
+          preferenceRank,
+          allocationScore: Math.round(allocationScore),
         });
       }
     }
@@ -210,9 +218,9 @@ async function smartAllocationAlgorithm() {
 app.post('/api/students', async (req, res) => {
   try {
     const { email } = req.body;
-    
+
     let student = await Student.findOne({ email });
-    
+
     if (student) {
       Object.assign(student, req.body);
       await student.save();
@@ -240,9 +248,9 @@ app.get('/api/students', async (req, res) => {
 app.post('/api/professors', async (req, res) => {
   try {
     const { email } = req.body;
-    
+
     let professor = await Professor.findOne({ email });
-    
+
     if (professor) {
       Object.assign(professor, req.body);
       await professor.save();
@@ -270,10 +278,10 @@ app.get('/api/professors', async (req, res) => {
 app.post('/api/allocations/bulk', async (req, res) => {
   try {
     const allocations = await smartAllocationAlgorithm();
-    
+
     await Allocation.deleteMany({});
     const result = await Allocation.insertMany(allocations);
-    
+
     res.json({ count: result.length, message: 'Smart allocations completed' });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -296,12 +304,15 @@ app.get('/api/stats', async (req, res) => {
     const totalProfessors = await Professor.countDocuments();
     const allocationCount = await Allocation.countDocuments();
     const firstChoice = await Allocation.countDocuments({ preferenceRank: 1 });
-    
+
     res.json({
       totalStudents,
       totalProfessors,
       allocationCount,
-      firstChoice: allocationCount > 0 ? Math.round((firstChoice / totalStudents) * 100) : 0
+      firstChoice:
+        allocationCount > 0
+          ? Math.round((firstChoice / totalStudents) * 100)
+          : 0,
     });
   } catch (err) {
     res.status(400).json({ error: err.message });
